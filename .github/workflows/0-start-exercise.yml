@@ -1,0 +1,58 @@
+name: Step 0 # 演習を開始
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write # README を更新
+  actions: write # workflow を無効化/有効化
+  issues: write # issue を作成し、issue にコメントする
+
+env:
+  STEP_1_FILE: ".github/steps/1-create-a-branch.md"
+
+jobs:
+  start_exercise:
+    if: |
+      !github.event.repository.is_template
+    name: Start Exercise
+    uses: ./.github/workflows/ja-start-exercise.yml
+    with:
+      exercise-title: "GitHub 入門"
+      intro-message: "GitHub を初めて使う場合、他の開発者が作業の整理や共同作業に ___**issues**___ を使っていることに気づくかもしれません。ここでも同じことをします。詳しくは別のレッスンで扱いますが、今日は基本を紹介します。"
+
+  post_next_step_content:
+    name: Post next step content
+    runs-on: ubuntu-latest
+    needs: [start_exercise]
+    env:
+      ISSUE_REPOSITORY: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ needs.start_exercise.outputs.issue-number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create comment - add step content
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: ${{ env.STEP_1_FILE }}
+
+      - name: Create comment - watching for progress
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: .github/ja-templates/step-feedback/watching-for-progress.md
+
+      - name: Disable current workflow and enable next one
+        run: |
+          gh workflow enable "Step 1"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

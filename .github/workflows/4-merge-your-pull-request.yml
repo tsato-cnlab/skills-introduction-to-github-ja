@@ -1,0 +1,68 @@
+name: Step 4 # プルリクエストをマージ
+
+# 学習者がステップ 4 のタスクを完了したか確認する。
+# - ユーザーがプルリクエストをマージしたときに実行される。
+# - すべてのチェックに合格すると、再実行されないよう workflow を無効化する。そのため、workflow status badge は緑色に変わる。
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+env:
+  REVIEW_FILE: ".github/steps/x-review.md"
+
+jobs:
+  find_exercise:
+    name: Find Exercise Issue
+    uses: skills/exercise-toolkit/.github/workflows/find-exercise-issue.yml@v0.5.0
+    with:
+      issue-title-text: "GitHub 入門"
+
+  post_review_content:
+    name: Post review content
+    needs: [find_exercise]
+    runs-on: ubuntu-latest
+    if: |
+      !github.event.repository.is_template
+    env:
+      ISSUE_REPOSITORY: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ needs.find_exercise.outputs.issue-number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create comment - step finished
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: .github/ja-templates/step-feedback/lesson-review.md
+
+      - name: Create comment - add review content
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: ${{ env.REVIEW_FILE }}
+
+      - name: Disable current workflow
+        run: gh workflow disable "${{github.workflow}}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  finish_exercise:
+    name: Finish Exercise
+    needs: [find_exercise, post_review_content]
+    uses: ./.github/workflows/ja-finish-exercise.yml
+    with:
+      issue-url: ${{ needs.find_exercise.outputs.issue-url }}
+      exercise-title: "GitHub 入門"
